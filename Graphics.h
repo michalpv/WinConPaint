@@ -7,5 +7,6 @@
 void DrawCell(SHORT X, SHORT Y, unsigned char r, unsigned char g, unsigned char b);
 
 // Clear canvas function
+void ClearCanvas();
 
 #endif

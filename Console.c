@@ -43,18 +43,3 @@ int ConsoleSetup(HANDLE hConIn, HANDLE hConOut) {
 
 	return 0;
 }
-
-DWORD GetMouseState(struct MouseRecord *mouseRecord, HANDLE hConIn) {
-	INPUT_RECORD inputRecord;
-	DWORD inputsRead;
-	
-	if(!ReadConsoleInput(hConIn, &inputRecord, 1, &inputsRead)) {
-		return GetLastError();
-	}
-	if (inputRecord.EventType == MOUSE_EVENT) {
-		mouseRecord->X = inputRecord.Event.MouseEvent.dwMousePosition.X;
-		mouseRecord->Y = inputRecord.Event.MouseEvent.dwMousePosition.Y;
-		mouseRecord->buttonState = inputRecord.Event.MouseEvent.dwButtonState; // https://docs.microsoft.com/en-us/windows/console/mouse-event-record-str
-	}
-	return 0;
-}

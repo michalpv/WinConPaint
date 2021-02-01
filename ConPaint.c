@@ -1,7 +1,9 @@
-#include <windows.h>
+#include <Windows.h>
 #include <stdio.h>
 #include "Console.h"
 #include "Graphics.h"
+
+#pragma comment(lib, "Comdlg32.lib")
 
 int main() {
 	// Setup console for VT sequences and mouse input
@@ -21,29 +23,79 @@ int main() {
 	
 	// Only after this point is it safe to use VT sequences
 	
-	struct MouseRecord prevMouseRecord = {0, 0, 0}; // Set X, Y, and buttonState to 0 (no mouse button down)
+	MOUSE_EVENT_RECORD prevMouseRecord;
+	COLORREF rgbCurrent = 0xFF0000; // 0x00bbggrr - https://docs.microsoft.com/en-us/windows/win32/gdi/colorref
+	static COLORREF acrCustClr[16]; // array of custom colors for ChooseColor function
 	
 	while(1) {
-		struct MouseRecord mouseRecord;
-		if (!(res = GetMouseState(&mouseRecord, hConIn))) {
-			if (!(mouseRecord.X == prevMouseRecord.X && mouseRecord.Y == prevMouseRecord.Y && mouseRecord.buttonState == prevMouseRecord.buttonState)) { // Conditional checking to make sure that current input is different from previous input
-				// Check for buttonState
-				if (mouseRecord.buttonState == FROM_LEFT_1ST_BUTTON_PRESSED) {
-					// Call graphics function to draw to screen
-					DrawCell(mouseRecord.X + 1, mouseRecord.Y + 1, 0, 0, 255); // Draw
-				}
-				if (mouseRecord.buttonState == RIGHTMOST_BUTTON_PRESSED) {
-					// Call graphics function to draw to screen
-					DrawCell(mouseRecord.X + 1, mouseRecord.Y + 1, 0, 0, 0); // Erase
-				}
-				
-				prevMouseRecord.X = mouseRecord.X;
-				prevMouseRecord.Y = mouseRecord.Y;
-				prevMouseRecord.buttonState = mouseRecord.buttonState;
-			}
+		INPUT_RECORD inputRecord;
+		DWORD inputsRead;
+	
+		if(!ReadConsoleInput(hConIn, &inputRecord, 1, &inputsRead)) {
+			printErr("ReadConsoleInput failed");
 		}
 		else {
-			return res;
+			switch(inputRecord.EventType) { // Input handler
+				case MOUSE_EVENT:
+					if (!(inputRecord.Event.MouseEvent.dwMousePosition.X == prevMouseRecord.dwMousePosition.X &&
+						inputRecord.Event.MouseEvent.dwMousePosition.Y == prevMouseRecord.dwMousePosition.Y &&
+						inputRecord.Event.MouseEvent.dwButtonState == prevMouseRecord.dwButtonState)) { // Check that mouse record is different before acting
+						
+						if (inputRecord.Event.MouseEvent.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED) {
+							// Call graphics function to draw to screen
+							DrawCell(inputRecord.Event.MouseEvent.dwMousePosition.X + 1, inputRecord.Event.MouseEvent.dwMousePosition.Y + 1, (rgbCurrent & 0xFF), (rgbCurrent >> 8) & 0xFF, (rgbCurrent >> 16)); // Draw
+						}
+						else if (inputRecord.Event.MouseEvent.dwButtonState == RIGHTMOST_BUTTON_PRESSED) {
+							// Call graphics function to draw to screen
+							DrawCell(inputRecord.Event.MouseEvent.dwMousePosition.X + 1, inputRecord.Event.MouseEvent.dwMousePosition.Y + 1, 0, 0, 0); // Erase
+						}
+						
+						// Set prevMouseRecord values to new mouse event record
+						/*
+						typedef struct _MOUSE_EVENT_RECORD {
+							COORD dwMousePosition;
+							DWORD dwButtonState;
+							DWORD dwControlKeyState;
+							DWORD dwEventFlags;
+						} MOUSE_EVENT_RECORD;
+						*/
+						
+						prevMouseRecord.dwMousePosition.X = inputRecord.Event.MouseEvent.dwMousePosition.X;
+						prevMouseRecord.dwMousePosition.Y = inputRecord.Event.MouseEvent.dwMousePosition.Y;
+						prevMouseRecord.dwButtonState = inputRecord.Event.MouseEvent.dwButtonState;
+						prevMouseRecord.dwControlKeyState = inputRecord.Event.MouseEvent.dwControlKeyState;
+						prevMouseRecord.dwEventFlags = inputRecord.Event.MouseEvent.dwEventFlags;
+					}
+					break;
+				case KEY_EVENT:
+						// Check that the key is down first:
+						if (inputRecord.Event.KeyEvent.bKeyDown) {
+							switch (inputRecord.Event.KeyEvent.uChar.AsciiChar) {
+								case 0x63: { // "c"
+									ClearCanvas();
+									break;
+								}
+								case 0x78: { // "x", color selector
+									CHOOSECOLOR cc;
+
+									// Initialize CHOOSECOLOR 
+									//memset(&cc, 0, sizeof(cc));
+									ZeroMemory(&cc, sizeof(cc));
+									cc.lStructSize = sizeof(cc);
+									//cc.hwndOwner = NULL;
+									cc.lpCustColors = (LPDWORD) acrCustClr;
+									cc.rgbResult = rgbCurrent;
+									cc.Flags = CC_FULLOPEN | CC_RGBINIT;
+									
+									if (ChooseColor(&cc)){
+										rgbCurrent = cc.rgbResult;
+									}
+									break;
+								}
+							}
+						}
+					break;
+			}
 		}
 	}
 }
