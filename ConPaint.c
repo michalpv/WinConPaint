@@ -95,6 +95,10 @@ int main() {
 							}
 						}
 					break;
+				case WINDOW_BUFFER_SIZE_EVENT: // When resized, cursor blinking needs to be disabled again
+					printf(ESC "[0;0H"); // Set cursor to 0, 0
+					printf(ESC "[?25l"); // Disable cursor blinking
+					break;
 			}
 		}
 	}
